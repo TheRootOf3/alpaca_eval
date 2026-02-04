@@ -97,13 +97,11 @@ def filter_leaderboard(
         # Find highlighted model's stats for comparison
         highlight_size = None
         highlight_score = None
-        highlight_rank = None
         if highlight_model:
             for rank, (name, row) in enumerate(df_filtered.iterrows(), 1):
                 if highlight_model.lower() in name.lower():
                     highlight_size = sizes[name]
                     highlight_score = row[sort_by] if sort_by in row else None
-                    highlight_rank = rank
                     break
 
         # Print formatted table
