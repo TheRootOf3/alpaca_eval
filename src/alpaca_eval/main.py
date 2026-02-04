@@ -33,6 +33,8 @@ def evaluate(
     max_instances: Optional[int] = None,
     annotation_kwargs: Optional[dict[str, Any]] = None,
     Annotator=annotators.PairwiseAnnotator,
+    is_load_annotations: bool = True,
+    chunksize: Optional[int] = 64,
     **annotator_kwargs,
 ):
     """Evaluate a model based on its outputs. This is the default entrypoint if no command is specified.
@@ -110,6 +112,14 @@ def evaluate(
     Annotator : class, optional
         The annotator class to use.
 
+    is_load_annotations : bool, optional
+        Whether to try to load annotations from the output path. If True and annotations exist, we only annotate
+        examples that don't have annotations yet. This enables resuming interrupted evaluations.
+
+    chunksize : int, optional
+        Number of instances to annotate before saving. If None, we save after all annotations. Smaller values
+        provide more frequent saves but may be slightly slower.
+
     annotator_kwargs :
         Additional arguments to pass to `PairwiseAnnotator`.
     """
@@ -118,6 +128,11 @@ def evaluate(
         and current_leaderboard_mode not in constants.ORDERED_LEADERBOARD_MODES
     ):
         raise ValueError(f"current_leaderboard_mode should be one of {constants.ORDERED_LEADERBOARD_MODES}")
+
+    # Validation for chunked annotation with incremental saving
+    if chunksize is not None and not is_load_annotations:
+        logging.info("`is_load_annotations` has to be True to use chunksize. Setting it to True.")
+        is_load_annotations = True
 
     annotation_kwargs = annotation_kwargs or dict()
 
@@ -151,10 +166,69 @@ def evaluate(
                     model_outputs = model_outputs[:max_instances]
                     reference_outputs = reference_outputs[:max_instances]
 
-                annotator = Annotator(annotators_config=annotators_config, **annotator_kwargs)
-                annotations = annotator.annotate_head2head(
-                    outputs_1=reference_outputs, outputs_2=model_outputs, **annotation_kwargs
+                # Compute output_path early for incremental saving
+                resolved_output_path = utils.get_output_path(
+                    output_path, arg_model_outputs, name, annotators_config=annotators_config
                 )
+                annotations_file = resolved_output_path / "annotations.json" if resolved_output_path else None
+
+                # Load existing annotations if available
+                old_annotations = None
+                if is_load_annotations and annotations_file and annotations_file.exists():
+                    logging.info(f"Loading existing annotations from {annotations_file}")
+                    old_annotations = pd.read_json(annotations_file)
+                    logging.info(f"Found {len(old_annotations)} existing annotations.")
+
+                # Disable default caching to config directory - we handle saving to output_path instead
+                annotator = Annotator(annotators_config=annotators_config, caching_path=None, **annotator_kwargs)
+
+                # Prepare data for head2head comparison
+                df_model = model_outputs.copy()
+                df_reference = reference_outputs.copy()
+
+                all_annotations = []
+                for df_model_chunk, df_ref_chunk in zip(
+                    utils.dataframe_chunk_generator(df_model, chunksize=chunksize, tqdm_desc="Annotation chunk"),
+                    utils.dataframe_chunk_generator(df_reference, chunksize=chunksize, tqdm_desc=None),
+                ):
+                    # Filter out already annotated examples
+                    if old_annotations is not None and len(old_annotations) > 0:
+                        # Match on instruction to find already annotated
+                        already_annotated_instructions = set(old_annotations["instruction"].values)
+                        mask = ~df_model_chunk["instruction"].isin(already_annotated_instructions)
+                        df_model_chunk = df_model_chunk[mask]
+                        df_ref_chunk = df_ref_chunk[mask]
+
+                    if len(df_model_chunk) == 0:
+                        logging.info("All examples in this chunk already annotated, skipping.")
+                        continue
+
+                    logging.info(f"Annotating {len(df_model_chunk)} examples in this chunk.")
+                    chunk_annotations = annotator.annotate_head2head(
+                        outputs_1=df_ref_chunk, outputs_2=df_model_chunk, **annotation_kwargs
+                    )
+                    all_annotations.extend(chunk_annotations)
+
+                    # Merge with old annotations and save incrementally
+                    if annotations_file:
+                        if old_annotations is not None:
+                            merged_annotations = pd.concat(
+                                [old_annotations, utils.convert_to_dataframe(chunk_annotations)],
+                                axis=0,
+                                ignore_index=True
+                            )
+                        else:
+                            merged_annotations = utils.convert_to_dataframe(all_annotations)
+                        # Update old_annotations for next iteration
+                        old_annotations = merged_annotations
+                        logging.info(f"Incrementally saving {len(merged_annotations)} annotations to {annotations_file}")
+                        merged_annotations.to_json(annotations_file, orient="records", indent=2)
+
+                # Final annotations: merge all
+                if old_annotations is not None:
+                    annotations = old_annotations.to_dict(orient="records")
+                else:
+                    annotations = all_annotations
 
                 leaderboard[name]["mode"] = current_leaderboard_mode
                 leaderboard[name]["avg_length"] = int(model_outputs["output"].str.len().mean())
