@@ -1,4 +1,5 @@
 """Helpers for plotting."""
+
 import logging
 import os
 import warnings
@@ -62,20 +63,33 @@ def show_length_gameability(df):
     """SHow the length gameability of two metrics."""
     lb_cv_ae = _get_lb_concise_verbose(df, "win_rate")
     lb_cv_lcae = _get_lb_concise_verbose(df, "length_controlled_winrate")
-    merged_df = pd.concat([lb_cv_ae, lb_cv_lcae], axis=1, keys=["AlpacaEval", "Length-controlled AlpacaEval"])
+    merged_df = pd.concat(
+        [lb_cv_ae, lb_cv_lcae],
+        axis=1,
+        keys=["AlpacaEval", "Length-controlled AlpacaEval"],
+    )
     styles = [
         {"selector": "thead tr:first-child th", "props": [("text-align", "center")]},
-        {"selector": "thead tr:last-child th:last-child", "props": [("border-right", "none")]},
+        {
+            "selector": "thead tr:last-child th:last-child",
+            "props": [("border-right", "none")],
+        },
         {"selector": ".col2", "props": [("border-right", "2px solid black")]},
     ]
 
     max_diff = max(
         (
-            abs(merged_df[("AlpacaEval", "concise")] - merged_df[("AlpacaEval", "standard")])
+            abs(
+                merged_df[("AlpacaEval", "concise")]
+                - merged_df[("AlpacaEval", "standard")]
+            )
             / merged_df[("AlpacaEval", "standard")]
         ).max(),
         (
-            abs(merged_df[("AlpacaEval", "verbose")] - merged_df[("AlpacaEval", "standard")])
+            abs(
+                merged_df[("AlpacaEval", "verbose")]
+                - merged_df[("AlpacaEval", "standard")]
+            )
             / merged_df[("AlpacaEval", "standard")]
         ).max(),
         (
@@ -94,7 +108,9 @@ def show_length_gameability(df):
         ).max(),
     )
     styled_df = (
-        merged_df.style.apply(_color_coding, max_diff=max_diff, axis=1).set_table_styles(styles).format("{:.1f}")
+        merged_df.style.apply(_color_coding, max_diff=max_diff, axis=1)
+        .set_table_styles(styles)
+        .format("{:.1f}")
     )
     return styled_df
 
@@ -110,7 +126,9 @@ def plot_benchmark_correlations(
     **kwargs,
 ):
     """Plot the benchmark correlations."""
-    df_corr = _get_benchmark_correlations(n_min_models=n_min_models, is_drop_alpaca=is_drop_alpaca)
+    df_corr = _get_benchmark_correlations(
+        n_min_models=n_min_models, is_drop_alpaca=is_drop_alpaca
+    )
 
     # Generate a custom diverging colormap
     if _is_color_brewer_cmap(cmap_name):
@@ -178,7 +196,9 @@ def show_new_lb(lb, column, n=None, n_tail=None, is_rm_rank_columns=True):
     rank_win_rate["rank"] = range(len(rank_win_rate))
     delta_lb["rank_win_rate"] = rank_win_rate.loc[delta_lb.index, "rank"]
 
-    rank_new_win_rate = delta_lb[col_new_win_rate].sort_values(ascending=False).to_frame()
+    rank_new_win_rate = (
+        delta_lb[col_new_win_rate].sort_values(ascending=False).to_frame()
+    )
     rank_new_win_rate["rank"] = range(len(rank_new_win_rate))
     delta_lb["rank_new_win_rate"] = rank_new_win_rate.loc[delta_lb.index, "rank"]
 
@@ -194,7 +214,9 @@ def show_new_lb(lb, column, n=None, n_tail=None, is_rm_rank_columns=True):
             n_tail = n_tail or n
             delta_lb = pd.concat([delta_lb.head(n), delta_lb.tail(n_tail)], axis=0)
 
-    format_dict = {col: "{:.1f}" for col in delta_lb.columns if delta_lb[col].dtype == "float64"}
+    format_dict = {
+        col: "{:.1f}" for col in delta_lb.columns if delta_lb[col].dtype == "float64"
+    }
 
     styled_delta_lb = (
         delta_lb.style.background_gradient(
@@ -217,7 +239,12 @@ def show_new_lb(lb, column, n=None, n_tail=None, is_rm_rank_columns=True):
     )
 
     if n is not None and n_tail:
-        separator_styles = [{"selector": f".row{n-1}", "props": [("border-bottom", "1.5px solid black")]}]
+        separator_styles = [
+            {
+                "selector": f".row{n - 1}",
+                "props": [("border-bottom", "1.5px solid black")],
+            }
+        ]
         styled_delta_lb = styled_delta_lb.set_table_styles(separator_styles)
 
     return styled_delta_lb
@@ -282,7 +309,9 @@ def plot_config(
 
     if file_to_default_rc is not None:
         try:
-            desired_rc = rc_params_from_file(file_to_default_rc, use_default_template=False).copy()
+            desired_rc = rc_params_from_file(
+                file_to_default_rc, use_default_template=False
+            ).copy()
         except Exception as e:
             if file_to_default_rc is not None:
                 logging.warning(f"Could not find {file_to_default_rc}. Error: {e}")
@@ -299,9 +328,11 @@ def plot_config(
 
         plt.rcParams.update(desired_rc)
 
-        with sns.axes_style(style=style, rc=desired_rc), sns.plotting_context(
-            context=context, font_scale=font_scale, rc=desired_rc
-        ), sns.color_palette(palette):
+        with (
+            sns.axes_style(style=style, rc=desired_rc),
+            sns.plotting_context(context=context, font_scale=font_scale, rc=desired_rc),
+            sns.color_palette(palette),
+        ):
             yield
             last_fig = plt.gcf()
             for i, ax in enumerate(last_fig.axes):
@@ -333,9 +364,14 @@ def evaluator_renamer(name):
 
 
 def plot_quality_vs_price_and_time(
-    evaluator_leaderboard: pd.DataFrame, min_agreement: float = 0.55, config_kwargs=None, **preprocess_kwargs
+    evaluator_leaderboard: pd.DataFrame,
+    min_agreement: float = 0.55,
+    config_kwargs=None,
+    **preprocess_kwargs,
 ):
-    df_all = _preprocess_evaluator_leaderboard(evaluator_leaderboard, min_agreement=min_agreement, **preprocess_kwargs)
+    df_all = _preprocess_evaluator_leaderboard(
+        evaluator_leaderboard, min_agreement=min_agreement, **preprocess_kwargs
+    )
 
     df_melted = df_all.melt(
         var_name="Variable",
@@ -380,10 +416,15 @@ def plot_quality_vs_price_and_time(
 
 
 def plot_quality_vs_price(
-    evaluator_leaderboard: pd.DataFrame, min_agreement: float = 0.55, config_kwargs=None, **preprocess_kwargs
+    evaluator_leaderboard: pd.DataFrame,
+    min_agreement: float = 0.55,
+    config_kwargs=None,
+    **preprocess_kwargs,
 ):
     config_kwargs = config_kwargs or dict()
-    df_all = _preprocess_evaluator_leaderboard(evaluator_leaderboard, min_agreement=min_agreement, **preprocess_kwargs)
+    df_all = _preprocess_evaluator_leaderboard(
+        evaluator_leaderboard, min_agreement=min_agreement, **preprocess_kwargs
+    )
 
     with plot_config(**config_kwargs):
         g = sns.relplot(
@@ -414,10 +455,15 @@ def plot_quality_vs_price(
 
 
 def plot_quality_vs_price(
-    evaluator_leaderboard: pd.DataFrame, min_agreement: float = 0.55, config_kwargs=None, **preprocess_kwargs
+    evaluator_leaderboard: pd.DataFrame,
+    min_agreement: float = 0.55,
+    config_kwargs=None,
+    **preprocess_kwargs,
 ):
     config_kwargs = config_kwargs or dict()
-    df_all = _preprocess_evaluator_leaderboard(evaluator_leaderboard, min_agreement=min_agreement, **preprocess_kwargs)
+    df_all = _preprocess_evaluator_leaderboard(
+        evaluator_leaderboard, min_agreement=min_agreement, **preprocess_kwargs
+    )
 
     with plot_config(**config_kwargs):
         g = sns.relplot(
@@ -448,10 +494,15 @@ def plot_quality_vs_price(
 
 
 def plot_quality_vs_time(
-    evaluator_leaderboard: pd.DataFrame, min_agreement: float = 0.55, config_kwargs=None, **preprocess_kwargs
+    evaluator_leaderboard: pd.DataFrame,
+    min_agreement: float = 0.55,
+    config_kwargs=None,
+    **preprocess_kwargs,
 ):
     config_kwargs = config_kwargs or dict()
-    df_all = _preprocess_evaluator_leaderboard(evaluator_leaderboard, min_agreement=min_agreement, **preprocess_kwargs)
+    df_all = _preprocess_evaluator_leaderboard(
+        evaluator_leaderboard, min_agreement=min_agreement, **preprocess_kwargs
+    )
 
     with plot_config(**config_kwargs):
         g = sns.relplot(
@@ -483,11 +534,16 @@ def plot_quality_vs_time(
 def plot_bias_vs_variance(
     evaluator_leaderboard: pd.DataFrame,
     min_agreement: float = 0.55,
-    config_kwargs=dict(is_use_tex=False, palette=sns.color_palette(np.array(sns.color_palette("colorblind"))[1:])),
+    config_kwargs=dict(
+        is_use_tex=False,
+        palette=sns.color_palette(np.array(sns.color_palette("colorblind"))[1:]),
+    ),
     **preprocess_kwargs,
 ):
     config_kwargs = config_kwargs or dict()
-    df_all = _preprocess_evaluator_leaderboard(evaluator_leaderboard, min_agreement=min_agreement, **preprocess_kwargs)
+    df_all = _preprocess_evaluator_leaderboard(
+        evaluator_leaderboard, min_agreement=min_agreement, **preprocess_kwargs
+    )
 
     with plot_config(**config_kwargs):
         g = sns.relplot(
@@ -504,7 +560,9 @@ def plot_bias_vs_variance(
 
         axes = g.axes.flatten()
         g.set_titles("")
-        plt.axvline(x=df_all.query("Annotator=='humans'")["Variance"].iloc[0], linestyle="--")
+        plt.axvline(
+            x=df_all.query("Annotator=='humans'")["Variance"].iloc[0], linestyle="--"
+        )
 
         axes[0].xaxis.set_major_locator(plt.MaxNLocator(5))
         axes[0].yaxis.set_major_locator(plt.MaxNLocator(5))
@@ -519,13 +577,18 @@ def plot_all_properties(
     evaluator_leaderboard: pd.DataFrame,
     properties_to_rm: Sequence[str] = ("# parsed",),
     min_agreement: float = 0.55,
-    config_kwargs=dict(is_use_tex=False, palette=sns.color_palette(np.array(sns.color_palette("colorblind"))[1:])),
+    config_kwargs=dict(
+        is_use_tex=False,
+        palette=sns.color_palette(np.array(sns.color_palette("colorblind"))[1:]),
+    ),
     annotators_to_rm: Sequence[str] = ("longest",),
     **preprocess_kwargs,
 ):
     properties_to_rm = list(properties_to_rm)
     config_kwargs = config_kwargs or dict()
-    annotators_to_keep = [c for c in evaluator_leaderboard.index if c not in annotators_to_rm]
+    annotators_to_keep = [
+        c for c in evaluator_leaderboard.index if c not in annotators_to_rm
+    ]
     df_all = _preprocess_evaluator_leaderboard(
         evaluator_leaderboard.drop(columns=properties_to_rm),
         min_agreement=min_agreement,
@@ -534,7 +597,9 @@ def plot_all_properties(
     )
 
     df_all["jitter"] = np.random.uniform(-0.5, 0.5, len(df_all))
-    df_melted = df_all.melt(var_name="Variable", value_name="value", id_vars=["Annotator", "jitter"])
+    df_melted = df_all.melt(
+        var_name="Variable", value_name="value", id_vars=["Annotator", "jitter"]
+    )
 
     with plot_config(**config_kwargs):
         g = sns.relplot(
@@ -589,7 +654,9 @@ def plot_winrate_correlations(
     models_to_keep = list(models_to_keep or df.index)
     df = df.loc[models_to_keep]
 
-    df = df.rename(columns=dict(win_rate_human="Human Win Rate", win_rate_auto="Auto Win Rate"))
+    df = df.rename(
+        columns=dict(win_rate_human="Human Win Rate", win_rate_auto="Auto Win Rate")
+    )
     with plot_config(**config_kwargs):
         g = sns.lmplot(data=df, y="Human Win Rate", x="Auto Win Rate")
 
@@ -598,11 +665,25 @@ def plot_winrate_correlations(
         axes[0].yaxis.set_major_locator(plt.MaxNLocator(6))
 
         def annotate(data, **kwargs):
-            s = scipy.stats.spearmanr(data["Human Win Rate"], data["Auto Win Rate"]).statistic
+            s = scipy.stats.spearmanr(
+                data["Human Win Rate"], data["Auto Win Rate"]
+            ).statistic
             r, _ = scipy.stats.pearsonr(data["Human Win Rate"], data["Auto Win Rate"])
             ax = plt.gca()
-            ax.text(0.05, 0.92, r"Spearman corr: {:.2f}".format(s), transform=ax.transAxes, fontsize=14)
-            ax.text(0.05, 0.84, "Pearson corr: {:.2f}".format(r), transform=ax.transAxes, fontsize=14)
+            ax.text(
+                0.05,
+                0.92,
+                r"Spearman corr: {:.2f}".format(s),
+                transform=ax.transAxes,
+                fontsize=14,
+            )
+            ax.text(
+                0.05,
+                0.84,
+                "Pearson corr: {:.2f}".format(r),
+                transform=ax.transAxes,
+                fontsize=14,
+            )
 
         g.map_dataframe(annotate)
 
@@ -631,7 +712,9 @@ def save_fig(fig, filename, dpi=500, is_tight=True):
         try:
             import dataframe_image as dfi
         except:
-            raise ImportError("You need to `pip install dataframe-image` to save df stylers to image.")
+            raise ImportError(
+                "You need to `pip install dataframe-image` to save df stylers to image."
+            )
         dfi.export(fig, filename, dpi=dpi)
 
     else:
@@ -659,7 +742,12 @@ def plot_paired_ttests(df):
 
 
 def plot_paired_ttests_per_dataset(df, is_print_values=False, is_add_alpaca_eval=False):
-    min_dataset_size = df.drop_duplicates("instruction").groupby("dataset")["instruction"].count().min()
+    min_dataset_size = (
+        df.drop_duplicates("instruction")
+        .groupby("dataset")["instruction"]
+        .count()
+        .min()
+    )
 
     all_pvalues = dict()
     for d in df["dataset"].unique():
@@ -671,7 +759,11 @@ def plot_paired_ttests_per_dataset(df, is_print_values=False, is_add_alpaca_eval
 
     if is_print_values:
         for i, (key, curr_df) in enumerate(all_pvalues.items()):
-            print(key, f"mean p-val: {curr_df.mean(axis=None):.3f}", f"max p-val: {curr_df.max(axis=None):.3f}")
+            print(
+                key,
+                f"mean p-val: {curr_df.mean(axis=None):.3f}",
+                f"max p-val: {curr_df.max(axis=None):.3f}",
+            )
 
     fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(23, 15))
 
@@ -705,21 +797,25 @@ def plot_paired_ttests_per_dataset(df, is_print_values=False, is_add_alpaca_eval
 def plot_paired_ttests_pvalues(df):
     df_ttest = _get_ttest_df(df)
     all_sub_ttest_df = {
-        n: _get_ttest_df(df, n_samples=n, random_state=123, sorted_idx=list(df_ttest.index))
+        n: _get_ttest_df(
+            df, n_samples=n, random_state=123, sorted_idx=list(df_ttest.index)
+        )
         for n in range(50, len(df["instruction"].unique()), 50)
     }
 
     df_describe = pd.DataFrame(
         {
             "mean": {k: v.mean(axis=None) for k, v in all_sub_ttest_df.items()},
-            "90% quantile": {k: v.stack().quantile(q=0.9) for k, v in all_sub_ttest_df.items()},
+            "90% quantile": {
+                k: v.stack().quantile(q=0.9) for k, v in all_sub_ttest_df.items()
+            },
             "max": {k: v.max(axis=None) for k, v in all_sub_ttest_df.items()},
         }
     )
 
-    melted = df_describe.melt(ignore_index=False, value_name="p-value", var_name="aggregator").reset_index(
-        names="# samples"
-    )
+    melted = df_describe.melt(
+        ignore_index=False, value_name="p-value", var_name="aggregator"
+    ).reset_index(names="# samples")
 
     with plot_config(rc={"lines.linewidth": 4, "axes.grid": False}):
         ax = sns.lineplot(melted, x="# samples", y="p-value", hue="aggregator")
@@ -730,7 +826,9 @@ def plot_paired_ttests_pvalues(df):
         handles, labels = ax.get_legend_handles_labels()
 
         # Create a new legend element for the horizontal line
-        legend_elements = [Line2D([0], [0], color="black", linestyle="--", label="0.05")]
+        legend_elements = [
+            Line2D([0], [0], color="black", linestyle="--", label="0.05")
+        ]
 
         # Combine the handles, labels, and new legend element
         all_handles = handles + legend_elements
@@ -745,13 +843,19 @@ def plot_paired_ttests_pvalues(df):
 def plot_paired_ttest_nsamples(df):
     df_ttest = _get_ttest_df(df)
     all_sub_ttest_df = {
-        n: _get_ttest_df(df, n_samples=n, random_state=123, sorted_idx=list(df_ttest.index))
+        n: _get_ttest_df(
+            df, n_samples=n, random_state=123, sorted_idx=list(df_ttest.index)
+        )
         for n in range(50, len(df["instruction"].unique()), 50)
     }
 
-    arr_min_samples = np.minimum.reduce([np.where(v < 0.05, k, float("inf")) for k, v in all_sub_ttest_df.items()])
+    arr_min_samples = np.minimum.reduce(
+        [np.where(v < 0.05, k, float("inf")) for k, v in all_sub_ttest_df.items()]
+    )
     arr_min_samples[np.isinf(arr_min_samples)] = np.nan
-    df_min_samples = pd.DataFrame(arr_min_samples, index=df_ttest.index, columns=df_ttest.index)
+    df_min_samples = pd.DataFrame(
+        arr_min_samples, index=df_ttest.index, columns=df_ttest.index
+    )
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 15))
     with plot_config(font_scale=0.55):
@@ -760,7 +864,8 @@ def plot_paired_ttest_nsamples(df):
             cbar=False,
             color="black",
             alpha=0.5,
-            mask=~df_min_samples.isnull() | np.triu(np.ones_like(df_ttest, dtype=bool), k=0),
+            mask=~df_min_samples.isnull()
+            | np.triu(np.ones_like(df_ttest, dtype=bool), k=0),
         )
         g = sns.heatmap(
             df_min_samples,
@@ -807,7 +912,11 @@ def _preprocess_evaluator_leaderboard(
         # puts humans at the top (easier for colors)
         idcs = list(df_all.index)
         idx_humans = idcs.index("humans")
-        idcs_reordered = [idx_humans] + list(range(0, idx_humans)) + list(range(idx_humans + 1, len(idcs)))
+        idcs_reordered = (
+            [idx_humans]
+            + list(range(0, idx_humans))
+            + list(range(idx_humans + 1, len(idcs)))
+        )
         df_all = df_all.iloc[idcs_reordered]
 
     return df_all
@@ -829,7 +938,9 @@ def _pairwise_ttest(df):
 
 def _get_ttest_df(df, n_samples=None, random_state=123, sorted_idx=None):
     """return a dataframe of pairwise relative ttest with potential subsampling"""
-    df_pivoted = df.pivot(index="instruction", values="preference", columns=["generator_2"])
+    df_pivoted = df.pivot(
+        index="instruction", values="preference", columns=["generator_2"]
+    )
     if n_samples is not None:
         df_pivoted = df_pivoted.sample(n=n_samples, random_state=random_state)
     # win_rate = metrics.pairwise_to_winrate(df["preference"])['win_rate']
@@ -840,12 +951,16 @@ def _get_ttest_df(df, n_samples=None, random_state=123, sorted_idx=None):
             .sort_values(ascending=False)
             .index
         )
-    return _pairwise_ttest(df_pivoted[sorted_idx].replace({0: 1, 1: 0})).astype(float)  # draw is 0 but to test order it
+    return _pairwise_ttest(df_pivoted[sorted_idx].replace({0: 1, 1: 0})).astype(
+        float
+    )  # draw is 0 but to test order it
     # should be in the middle
 
 
 def _get_benchmark_correlations(
-    n_min_models=25, filename=constants.BASE_DIR / "notebooks/benchmarks.csv", is_drop_alpaca=True
+    n_min_models=25,
+    filename=constants.BASE_DIR / "notebooks/benchmarks.csv",
+    is_drop_alpaca=True,
 ):
     """Get the spearman correlation between the benchmarks."""
     min_periods = n_min_models - 1
@@ -854,7 +969,11 @@ def _get_benchmark_correlations(
     df.columns = [c.split("\n")[0] for c in df.columns]
     if is_drop_alpaca:
         df = df.drop(columns=["AlpacaEval 2.0", "AlpacaEval 1.0"])
-    df_corr = df.corr(method="spearman", min_periods=min_periods).dropna(how="all", axis=0).dropna(how="all", axis=1)
+    df_corr = (
+        df.corr(method="spearman", min_periods=min_periods)
+        .dropna(how="all", axis=0)
+        .dropna(how="all", axis=1)
+    )
     # order by performance
     df_corr = df.loc[:, df_corr["Arena Elo"].sort_values(ascending=False).index].corr(
         method="spearman", min_periods=min_periods
@@ -865,31 +984,55 @@ def _get_benchmark_correlations(
 def _is_color_brewer_cmap(cmap_name):
     """Return whether a cmap name is a color brewer cmap."""
     # hack that works for many cases
-    return sum(1 for c in cmap_name if c.isupper()) == sum(1 for c in cmap_name if c.islower())
+    return sum(1 for c in cmap_name if c.isupper()) == sum(
+        1 for c in cmap_name if c.islower()
+    )
 
 
 def _get_lb_concise_verbose(lb, metric):
     game_process_v = lambda s: s.replace("_verbose", "")
     game_process_c = lambda s: s.replace("_concise", "")
-    gamed_models = [i for i in lb.index if (i + "_verbose") in lb.index and (i + "_concise") in lb.index]
-    lb["gamed_verbose_only"] = [game_process_v(i) if game_process_v(i) in gamed_models else None for i in lb.index]
-    lb["gamed_concise_only"] = [game_process_c(i) if game_process_c(i) in gamed_models else None for i in lb.index]
+    gamed_models = [
+        i
+        for i in lb.index
+        if (i + "_verbose") in lb.index and (i + "_concise") in lb.index
+    ]
+    lb["gamed_verbose_only"] = [
+        game_process_v(i) if game_process_v(i) in gamed_models else None
+        for i in lb.index
+    ]
+    lb["gamed_concise_only"] = [
+        game_process_c(i) if game_process_c(i) in gamed_models else None
+        for i in lb.index
+    ]
 
-    lb_concise = lb[lb["gamed_verbose_only"].isnull() & ~lb["gamed_concise_only"].isnull()]
-    lb_normal = lb[~lb["gamed_verbose_only"].isnull() & ~lb["gamed_concise_only"].isnull()]
-    lb_verbose = lb[~lb["gamed_verbose_only"].isnull() & lb["gamed_concise_only"].isnull()]
+    lb_concise = lb[
+        lb["gamed_verbose_only"].isnull() & ~lb["gamed_concise_only"].isnull()
+    ]
+    lb_normal = lb[
+        ~lb["gamed_verbose_only"].isnull() & ~lb["gamed_concise_only"].isnull()
+    ]
+    lb_verbose = lb[
+        ~lb["gamed_verbose_only"].isnull() & lb["gamed_concise_only"].isnull()
+    ]
 
-    win_rate_normal = lb_normal.sort_values(by="gamed_concise_only").rename(columns={metric: "standard"})["standard"]
+    win_rate_normal = lb_normal.sort_values(by="gamed_concise_only").rename(
+        columns={metric: "standard"}
+    )["standard"]
 
-    win_rate_verbose = lb_verbose.sort_values(by="gamed_verbose_only").rename(columns={metric: "verbose"})["verbose"]
+    win_rate_verbose = lb_verbose.sort_values(by="gamed_verbose_only").rename(
+        columns={metric: "verbose"}
+    )["verbose"]
     win_rate_verbose.index = win_rate_normal.index
 
-    win_rate_concise = lb_concise.sort_values(by="gamed_concise_only").rename(columns={metric: "concise"})["concise"]
+    win_rate_concise = lb_concise.sort_values(by="gamed_concise_only").rename(
+        columns={metric: "concise"}
+    )["concise"]
     win_rate_concise.index = win_rate_normal.index
 
-    return pd.concat([win_rate_concise, win_rate_normal, win_rate_verbose], axis=1).sort_values(
-        by="standard", ascending=False
-    )
+    return pd.concat(
+        [win_rate_concise, win_rate_normal, win_rate_verbose], axis=1
+    ).sort_values(by="standard", ascending=False)
 
 
 def _color_coding(row, max_diff):
@@ -903,7 +1046,13 @@ def _color_coding(row, max_diff):
         get_color(row[("AlpacaEval", "concise")], row[("AlpacaEval", "standard")]),
         "",
         get_color(row[("AlpacaEval", "verbose")], row[("AlpacaEval", "standard")]),
-        get_color(row[("Length-controlled AlpacaEval", "concise")], row[("Length-controlled AlpacaEval", "standard")]),
+        get_color(
+            row[("Length-controlled AlpacaEval", "concise")],
+            row[("Length-controlled AlpacaEval", "standard")],
+        ),
         "",
-        get_color(row[("Length-controlled AlpacaEval", "verbose")], row[("Length-controlled AlpacaEval", "standard")]),
+        get_color(
+            row[("Length-controlled AlpacaEval", "verbose")],
+            row[("Length-controlled AlpacaEval", "standard")],
+        ),
     ]
