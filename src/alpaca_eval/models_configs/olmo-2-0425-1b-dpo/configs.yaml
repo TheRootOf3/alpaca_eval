@@ -4,7 +4,6 @@ olmo-2-0425-1b-dpo: # this should be the same as the name as the current directo
 
   # fn_completions: "vllm_local_completions" # what function should be used to generate completions. See `src/alpaca_eval/decoders` for options
   completions_kwargs: # parameters to the completion function
-    model_name: "allenai/OLMo-2-0425-1B-DPO"
     model_kwargs:
       dtype: bfloat16
       trust_remote_code: True
@@ -14,4 +13,3 @@ olmo-2-0425-1b-dpo: # this should be the same as the name as the current directo
     do_sample: True
     batch_size: 32
   pretty_name: "Olmo2 1B DPO" # name in the leaderboard
-  link: "https://huggingface.co/allenai/OLMo-2-0425-1B-DPO" # link to the model's repo/information in the leaderboard

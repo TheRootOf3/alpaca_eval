@@ -33,7 +33,7 @@ def evaluate(
     max_instances: Optional[int] = None,
     annotation_kwargs: Optional[dict[str, Any]] = None,
     Annotator=annotators.PairwiseAnnotator,
-    is_load_annotations: bool = True,
+    attempt_load_cached_annotations: bool = True,
     chunksize: Optional[int] = 64,
     **annotator_kwargs,
 ):
@@ -112,7 +112,7 @@ def evaluate(
     Annotator : class, optional
         The annotator class to use.
 
-    is_load_annotations : bool, optional
+    attempt_load_cached_annotations : bool, optional
         Whether to try to load annotations from the output path. If True and annotations exist, we only annotate
         examples that don't have annotations yet. This enables resuming interrupted evaluations.
 
@@ -130,9 +130,9 @@ def evaluate(
         raise ValueError(f"current_leaderboard_mode should be one of {constants.ORDERED_LEADERBOARD_MODES}")
 
     # Validation for chunked annotation with incremental saving
-    if chunksize is not None and not is_load_annotations:
-        logging.info("`is_load_annotations` has to be True to use chunksize. Setting it to True.")
-        is_load_annotations = True
+    if chunksize is not None and not attempt_load_cached_annotations:
+        logging.info("`attempt_load_cached_annotations` has to be True to use chunksize. Setting it to True.")
+        attempt_load_cached_annotations = True
 
     annotation_kwargs = annotation_kwargs or dict()
 
@@ -174,7 +174,7 @@ def evaluate(
 
                 # Load existing annotations if available
                 old_annotations = None
-                if is_load_annotations and annotations_file and annotations_file.exists():
+                if attempt_load_cached_annotations and annotations_file and annotations_file.exists():
                     logging.info(f"Loading existing annotations from {annotations_file}")
                     old_annotations = pd.read_json(annotations_file)
                     logging.info(f"Found {len(old_annotations)} existing annotations.")
@@ -304,6 +304,8 @@ def evaluate_from_model(
     is_strip_output: bool = True,
     is_load_outputs: bool = True,
     chunksize: int = 64,
+    model_name: Optional[str] = None,
+    model_revision: Optional[str] = None,
     **kwargs,
 ):
     """Evaluate a model from HuggingFace or an API provider. This is a wrapper around `evaluate` which includes
@@ -348,6 +350,15 @@ def evaluate_from_model(
     chunksize : int, optional
         Number of instances to generate before saving. If None, we save after all generations.
 
+    model_name : str, optional
+        Override the model name/path in the loaded config's completions_kwargs. Useful for evaluating different
+        checkpoints or fine-tuned variants without creating a new config. Can be a HuggingFace repo name
+        (e.g. 'my-org/my-model') or a local path to a model directory.
+
+    model_revision : str, optional
+        HuggingFace model revision (branch name, tag, or commit hash) to use. Sets the 'revision' parameter
+        in model_kwargs, which is passed to from_pretrained().
+
     kwargs:
         Other kwargs to `evaluate`
     """
@@ -363,6 +374,32 @@ def evaluate_from_model(
 
     base_dir = Path(kwargs.get("base_dir", constants.MODELS_CONFIG_DIR))
     model_configs = utils.load_configs(model_configs, relative_to=base_dir)
+
+    # Apply CLI overrides to the loaded config
+    if model_name is not None or model_revision is not None:
+        old_key = list(model_configs.keys())[0]
+        config = model_configs[old_key]
+
+        if model_name is not None:
+            logging.info(f"Overriding model_name: {config['completions_kwargs'].get('model_name')} -> {model_name}")
+            config["completions_kwargs"]["model_name"] = model_name
+
+        if model_revision is not None:
+            if "model_kwargs" not in config["completions_kwargs"]:
+                config["completions_kwargs"]["model_kwargs"] = {}
+            logging.info(f"Setting model revision: {model_revision}")
+            config["completions_kwargs"]["model_kwargs"]["revision"] = model_revision
+
+        # Derive generator name from model_name and revision
+        new_key = model_name.replace("/", "__") if model_name is not None else old_key
+        if model_revision is not None:
+            new_key = f"{new_key}__{model_revision}"
+        if new_key != old_key:
+            logging.info(f"Renaming generator: {old_key} -> {new_key}")
+            model_configs = {new_key: config}
+        else:
+            model_configs[old_key] = config
+
     if reference_model_configs is not None:
         reference_model_configs = utils.load_configs(reference_model_configs, relative_to=base_dir)
 
